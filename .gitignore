@@ -1,9 +1,17 @@
 __pycache__/
 *.pyc
-*.db
-*.sqlite
-.env
+
+# venv / IDE
 .venv/
+.env
 .idea/
 .vscode/
+
+# SQLite
+*.db
+*.sqlite
+*.db-wal
+*.db-shm
+
+# data cruda (inputs del reloj)
 data/raw/
