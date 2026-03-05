@@ -98,9 +98,12 @@ python db/export_processed.py 2025 12
 Genera `data/processed/liquidacion_2025_12.txt` con formato:
 ```
 ID    Nombre        HorasTrabajadas    Monto(antes de vale)    Vales    MontoFinal(luego de vales)
-1     Juan          162:06             26125.66                3000.00  23125.66
+1     Juan          162:06             $26126                  $3000    $23126
+2     Ana           120:00             $18000                  $22000   0 ($-4000)
 ```
 También genera `data/processed/liquidacion_2025_12.xlsx` con las mismas columnas.
+Los montos se exportan como pesos enteros (sin decimales) y con prefijo `$`.
+Si el monto final es negativo, se muestra como `0 ($-valor)` para evitar confusiones.
 
 ## UI Streamlit
 

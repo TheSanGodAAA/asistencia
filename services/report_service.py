@@ -11,6 +11,27 @@ def _fmt_horas(minutos: int) -> str:
     return f"{hh:02d}:{mm:02d}"
 
 
+def _cent_to_peso_entero(centavos: int) -> int:
+    """Convierte centavos a pesos enteros redondeando al peso más cercano.
+
+    Mantiene simetría para valores negativos (p. ej. deudas por vales).
+    """
+    c = int(centavos)
+    if c >= 0:
+        return (c + 50) // 100
+    return -((-c + 50) // 100)
+
+
+def _fmt_money(pesos: int) -> str:
+    return f"${int(pesos)}"
+
+
+def _fmt_final_money(pesos: int) -> str:
+    if pesos < 0:
+        return f"0 (${int(pesos)})"
+    return _fmt_money(pesos)
+
+
 def _resolve_cols(conn) -> tuple[str, str, str]:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(liquidacion_detalle)").fetchall()}
 
@@ -66,17 +87,17 @@ def build_liquidacion_export_rows(anio: int, mes: int) -> list[tuple[int, str, s
 
     records: list[tuple[int, str, str, str, str, str]] = []
     for emp_id, nombre, minutos, bruto_cent, vales_cent, final_cent in rows:
-        bruto_uyu = int(bruto_cent) / 100.0
-        vales_uyu = int(vales_cent) / 100.0
-        final_uyu = int(final_cent) / 100.0
+        bruto_pesos = _cent_to_peso_entero(int(bruto_cent))
+        vales_pesos = _cent_to_peso_entero(int(vales_cent))
+        final_pesos = _cent_to_peso_entero(int(final_cent))
         records.append(
             (
                 int(emp_id),
                 str(nombre),
                 _fmt_horas(int(minutos)),
-                f"{bruto_uyu:.2f}",
-                f"{vales_uyu:.2f}",
-                f"{final_uyu:.2f}",
+                _fmt_money(bruto_pesos),
+                _fmt_money(vales_pesos),
+                _fmt_final_money(final_pesos),
             )
         )
     return records
