@@ -8,7 +8,7 @@ from datetime import datetime
 LINE_RE = re.compile(
     r"^\s*(?P<ac_no>\d+)\s+"
     r"(?P<fecha>\d{1,2}/\d{1,2}/\d{4})\s+"
-    r"(?P<hora>\d{1,2}:\d{2})\s+"
+    r"(?P<hora>\d{1,2}:\d{2}(?::\d{2})?)\s+"
     r"(?P<estado>.+?)\s*$"
 )
 
@@ -51,7 +51,11 @@ def parse_line(line: str) -> dict | None:
     if tipo is None:
         return None
 
-    ts = datetime.strptime(f"{fecha} {hora}", "%d/%m/%Y %H:%M")
+    dt_raw = f"{fecha} {hora}"
+    if hora.count(":") == 2:
+        ts = datetime.strptime(dt_raw, "%d/%m/%Y %H:%M:%S")
+    else:
+        ts = datetime.strptime(dt_raw, "%d/%m/%Y %H:%M")
 
     return {
         "ac_no": ac_no,

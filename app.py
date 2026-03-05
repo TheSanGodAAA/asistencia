@@ -2,11 +2,14 @@ import argparse
 from datetime import date
 
 from pathlib import Path
+import sys
 
-from core.parser import parse_file
-from core.importer import import_txt
-from core.jornadas import calcular_jornadas
-from core.liquidacion import crear_borrador_liquidacion, cerrar_liquidacion
+from core.logger import get_logger
+from services.import_service import import_marcaciones_from_txt
+from services.jornadas_service import calcular_jornadas_rango
+from services.liquidacion_service import crear_liquidacion_borrador, cerrar_liquidacion_mensual
+
+logger = get_logger(__name__)
 
 
 def _parse_yyyy_mm_dd(s: str) -> date:
@@ -15,25 +18,52 @@ def _parse_yyyy_mm_dd(s: str) -> date:
 
 
 def cmd_import(args):
-    path = Path(args.path)
-    records = list(parse_file(path))
-    import_txt(path, records)
+    try:
+        logger.info(f"Importando archivo: {args.path}")
+        path = Path(args.path)
+        if not path.exists():
+            logger.error(f"Archivo no encontrado: {path}")
+            sys.exit(1)
+        parsed = import_marcaciones_from_txt(path)
+        logger.info(f"Registros parseados: {parsed}")
+        logger.info("Importación completada exitosamente.")
+    except Exception as e:
+        logger.error(f"Error durante importación: {e}", exc_info=True)
+        sys.exit(1)
 
 
 def cmd_jornadas(args):
-    desde = _parse_yyyy_mm_dd(args.desde)
-    hasta = _parse_yyyy_mm_dd(args.hasta)
-    calcular_jornadas(desde, hasta)
+    try:
+        logger.info(f"Calculando jornadas: {args.desde} hasta {args.hasta}")
+        desde = _parse_yyyy_mm_dd(args.desde)
+        hasta = _parse_yyyy_mm_dd(args.hasta)
+        calcular_jornadas_rango(desde, hasta)
+        logger.info("Jornadas calculadas exitosamente.")
+    except Exception as e:
+        logger.error(f"Error al calcular jornadas: {e}", exc_info=True)
+        sys.exit(1)
 
 
 def cmd_liquidar(args):
-    lid = crear_borrador_liquidacion(args.anio, args.mes)
-    print("Liquidación borrador id:", lid)
+    try:
+        logger.info(f"Creando liquidación borrador: {args.anio}-{args.mes:02d}")
+        lid = crear_liquidacion_borrador(args.anio, args.mes)
+        logger.info(f"Liquidación borrador creada con id={lid}")
+        print(f"✓ Liquidación borrador id: {lid}")
+    except Exception as e:
+        logger.error(f"Error al crear liquidación: {e}", exc_info=True)
+        sys.exit(1)
 
 
 def cmd_cerrar(args):
-    cerrar_liquidacion(args.anio, args.mes)
-    print("Liquidación CERRADA.")
+    try:
+        logger.info(f"Cerrando liquidación: {args.anio}-{args.mes:02d}")
+        cerrar_liquidacion_mensual(args.anio, args.mes)
+        logger.info(f"Liquidación cerrada: {args.anio}-{args.mes:02d}")
+        print(f"✓ Liquidación CERRADA: {args.anio}-{args.mes:02d}")
+    except Exception as e:
+        logger.error(f"Error al cerrar liquidación: {e}", exc_info=True)
+        sys.exit(1)
 
 
 def main():
@@ -59,8 +89,12 @@ def main():
     p_c.add_argument("mes", type=int)
     p_c.set_defaults(func=cmd_cerrar)
 
-    args = p.parse_args()
-    args.func(args)
+    try:
+        args = p.parse_args()
+        args.func(args)
+    except Exception as e:
+        logger.error(f"Error inesperado: {e}", exc_info=True)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

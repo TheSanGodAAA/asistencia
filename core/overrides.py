@@ -1,14 +1,27 @@
 # core/overrides.py
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, date
 
-def _minutos_entre(ent_iso: str, sal_iso: str) -> int:
-    ent = datetime.fromisoformat(ent_iso)
-    sal = datetime.fromisoformat(sal_iso)
-    if sal <= ent:
-        raise ValueError("Salida <= Entrada")
-    return int((sal - ent).total_seconds() // 60)
+
+def _to_datetime_maybe_full(s: str, fecha_str: str) -> datetime:
+    """Convierte una cadena que puede ser ISO completa o solo hora (HH:MM o HH:MM:SS)
+    a un objeto datetime combinándolo con `fecha_str` cuando haga falta.
+    """
+    s = s.strip()
+    
+    # si ya incluye fecha (ej. '2025-12-01T08:00:00' o '2025-12-01 08:00:00')
+    if "T" in s or (" " in s and len(s) > 10):
+        # Normalizar: reemplazar espacio con 'T' para fromisoformat
+        s_normalized = s.replace(" ", "T")
+        return datetime.fromisoformat(s_normalized)
+
+    # hora sola: aceptar 'HH:MM' o 'HH:MM:SS'
+    fmt = "%H:%M:%S" if s.count(":") == 2 else "%H:%M"
+    t = datetime.strptime(s, fmt).time()
+    d = date.fromisoformat(fecha_str)
+    return datetime.combine(d, t)
+
 
 def aplicar_override(
     conn,
@@ -19,23 +32,36 @@ def aplicar_override(
 ) -> None:
     """
     Aplica corrección manual:
-    - Guarda histórico en jornadas_override (una fila por aplicación)
-    - Actualiza jornadas: entrada_calc/salida_calc/minutos_calc + estado OK (detalle NULL)
+    - Guarda histórico en `jornadas_override` (guarda sólo la hora HH:MM:SS en los campos manuales)
+    - Actualiza `jornadas`: `entrada_calc`/`salida_calc` se guardan como hora (HH:MM:SS),
+      `minutos_calc` recalculado y `estado` puesto a 'OK'.
+    Se aceptan entradas con fecha completa (ISO) o sólo hora.
     """
-    minutos = _minutos_entre(entrada_iso, salida_iso)
+    # obtener fecha de la jornada para combinar en caso de hora sola
+    row = conn.execute("SELECT fecha FROM jornadas WHERE id = ?", (jornada_id,)).fetchone()
+    if not row:
+        raise RuntimeError(f"Jornada {jornada_id} no encontrada")
+    fecha_str = row[0]
+
+    ent_dt = _to_datetime_maybe_full(entrada_iso, fecha_str)
+    sal_dt = _to_datetime_maybe_full(salida_iso, fecha_str)
+    if sal_dt <= ent_dt:
+        raise ValueError("Salida <= Entrada")
+    minutos = int((sal_dt - ent_dt).total_seconds() // 60)
+
     now = datetime.now().isoformat()
 
-    # 1) Guardar override (histórico)
+    # 1) Guardar override (histórico) - almacenamos sólo la hora para mayor legibilidad
     conn.execute(
         """
         INSERT INTO jornadas_override
         (jornada_id, entrada_manual, salida_manual, motivo, creado_en)
         VALUES (?, ?, ?, ?, ?)
         """,
-        (jornada_id, entrada_iso, salida_iso, motivo, now),
+        (jornada_id, ent_dt.time().isoformat(), sal_dt.time().isoformat(), motivo, now),
     )
 
-    # 2) Pisar la jornada (esto te faltaba para que NO quede NULL)
+    # 2) Actualizar la jornada: guardar horas (HH:MM:SS) en los campos calculados
     conn.execute(
         """
         UPDATE jornadas
@@ -47,5 +73,5 @@ def aplicar_override(
             detalle      = NULL
         WHERE id = ?
         """,
-        (entrada_iso, salida_iso, minutos, jornada_id),
+        (ent_dt.time().isoformat(), sal_dt.time().isoformat(), minutos, jornada_id),
     )

@@ -213,8 +213,8 @@ def calcular_jornadas(desde: date, hasta: date):
                     (
                         emp_id,
                         d.isoformat(),
-                        ent.isoformat() if ent else None,
-                        sal.isoformat() if sal else None,
+                        ent.time().isoformat() if ent else None,
+                        sal.time().isoformat() if sal else None,
                         minutos,
                         estado,
                         detalle,

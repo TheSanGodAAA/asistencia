@@ -4,6 +4,9 @@ from pathlib import Path
 import re
 
 from db.database import get_conn
+from core.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def file_hash(path: Path) -> str:
@@ -32,6 +35,7 @@ def import_txt(path: Path, records):
         # evitar importar dos veces el mismo archivo
         row = conn.execute("SELECT id FROM imports WHERE hash = ?", (h,)).fetchone()
         if row:
+            logger.warning(f"Archivo ya importado. Se omite: {path.name}")
             print("Archivo ya importado. Se omite.")
             return
 
@@ -43,6 +47,7 @@ def import_txt(path: Path, records):
             (path.name, h, datetime.now().isoformat()),
         )
         import_id = cur.lastrowid
+        logger.info(f"Import ID creado: {import_id} para archivo: {path.name}")
 
         for r in records:
             empleado_id = get_or_create_empleado(conn, int(r["ac_no"]))
@@ -66,4 +71,5 @@ def import_txt(path: Path, records):
                 ),
             )
 
+    logger.info(f"Importación completada: {len(records)} registros importados de {path.name}")
     print("Importación completada.")

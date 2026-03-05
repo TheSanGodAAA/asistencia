@@ -4,10 +4,11 @@ PRAGMA foreign_keys = ON;
 -- Empleados
 -- =========
 CREATE TABLE IF NOT EXISTS empleados (
-  id        INTEGER PRIMARY KEY AUTOINCREMENT,
-  ac_no     INTEGER NOT NULL UNIQUE,
-  nombre    TEXT    NOT NULL,
-  activo    INTEGER NOT NULL DEFAULT 1
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  ac_no           INTEGER NOT NULL UNIQUE,
+  nombre          TEXT    NOT NULL,
+  activo          INTEGER NOT NULL DEFAULT 1,
+  control_descanso INTEGER NOT NULL DEFAULT 0
 );
 
 -- ===========================
@@ -125,7 +126,32 @@ CREATE TABLE IF NOT EXISTS liquidacion_detalle (
   minutos_pagados    INTEGER NOT NULL,
   pago_hora_cent     INTEGER NOT NULL,
   monto_cent         INTEGER NOT NULL,
+  vales_cent         INTEGER NOT NULL DEFAULT 0,
+  monto_final_cent   INTEGER NOT NULL,
   FOREIGN KEY (liquidacion_id) REFERENCES liquidaciones(id) ON DELETE CASCADE,
   FOREIGN KEY (empleado_id) REFERENCES empleados(id),
   UNIQUE (liquidacion_id, empleado_id)
 );
+
+-- ==================
+-- Vales (adelantos)
+-- ==================
+CREATE TABLE IF NOT EXISTS vales (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  empleado_id   INTEGER NOT NULL,
+  fecha         TEXT    NOT NULL, -- YYYY-MM-DD
+  monto_cent    INTEGER NOT NULL CHECK(monto_cent >= 0),
+  nota          TEXT,
+  es_arrastre   INTEGER NOT NULL DEFAULT 0,
+  origen_anio   INTEGER,
+  origen_mes    INTEGER,
+  creado_en     TEXT    NOT NULL,
+  FOREIGN KEY (empleado_id) REFERENCES empleados(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_vales_emp_fecha
+  ON vales(empleado_id, fecha);
+
+CREATE INDEX IF NOT EXISTS idx_vales_arrastre_origen
+  ON vales(es_arrastre, origen_anio, origen_mes);
+
